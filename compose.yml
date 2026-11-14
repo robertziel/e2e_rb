@@ -1,0 +1,25 @@
+services:
+  test:
+    build: .
+    # The default bridge: no per-project network needed (the app runs in this container).
+    network_mode: bridge
+    working_dir: /gem
+    environment:
+      E2E_RB_PROJECT_DIR: /gem/example
+      E2E_RB_VERBOSE: ${E2E_RB_VERBOSE:-0}
+      E2E_MODEL: ${E2E_MODEL:-}
+      AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-}
+      CI: "1"
+    volumes:
+      - ./lib:/gem/lib
+      - ./bridge:/gem/bridge
+      - ./spec:/gem/spec
+      - ./example/spec:/gem/example/spec
+      - ./example/test:/gem/example/test
+      - ./example/app:/gem/example/app
+      - ./example/e2e.config.ts:/gem/example/e2e.config.ts
+    # Unit specs (no browser), then the browser examples in RSpec and Minitest.
+    command: >
+      sh -c "bundle exec rspec spec
+      && bundle exec rspec example/spec/greeting_spec.rb
+      && bundle exec ruby -Ilib example/test/greeting_test.rb"

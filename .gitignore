@@ -1,0 +1,5 @@
+/example/node_modules/
+/example/.e2e/
+/.bundle/
+/vendor/
+.env
