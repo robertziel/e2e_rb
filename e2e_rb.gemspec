@@ -12,7 +12,12 @@ Gem::Specification.new do |spec|
   spec.homepage = "https://github.com/robertziel/e2e_rb"
   spec.license = "Apache-2.0"
   spec.required_ruby_version = ">= 3.2"
-  spec.files = Dir["lib/**/*.rb", "bridge/*.mjs", "README.md", "LICENSE"]
+  spec.files = Dir["lib/**/*.rb", "bridge/*.mjs", "README.md", "CHANGELOG.md", "LICENSE"]
   spec.require_paths = ["lib"]
-  spec.metadata["rubygems_mfa_required"] = "true"
+  spec.metadata = {
+    "source_code_uri" => spec.homepage,
+    "changelog_uri" => "#{spec.homepage}/blob/main/CHANGELOG.md",
+    "bug_tracker_uri" => "#{spec.homepage}/issues",
+    "rubygems_mfa_required" => "true"
+  }
 end

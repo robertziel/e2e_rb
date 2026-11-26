@@ -1,25 +1,34 @@
+# Every name is documented in .env.example. `docker compose run --rm test` = the deterministic
+# suite (scripts/ci/suite.sh); `docker compose run --rm agentic` = the model-driven example.
+x-build: &build
+  context: .
+  args:
+    RUBY_VERSION: ${TEST_RUBY_VERSION:?set TEST_RUBY_VERSION in .env (.env.example)}
+    BUNDLE_GEMFILE: ${TEST_GEMFILE:?set TEST_GEMFILE in .env (.env.example)}
+
 services:
+  # No network at all: proves the deterministic gate needs no model, no telemetry and
+  # nothing outside the container (the app and the browser run in it).
   test:
-    build: .
-    # The default bridge: no per-project network needed (the app runs in this container).
-    network_mode: bridge
-    working_dir: /gem
+    build: *build
+    network_mode: none
     environment:
       E2E_RB_PROJECT_DIR: /gem/example
-      E2E_RB_VERBOSE: ${E2E_RB_VERBOSE:-0}
+      E2E_TELEMETRY_DISABLED: "1"
+      CI: "1"
+    command: scripts/ci/suite.sh
+
+  # Agent steps against a real model (E2E_MODEL_*; .env.example). To reach a server that
+  # listens only on a docker network, add compose.model-network.yml (COMPOSE_FILE in .env).
+  agentic:
+    build: *build
+    environment:
+      E2E_RB_PROJECT_DIR: /gem/example
+      E2E_TELEMETRY_DISABLED: "1"
       E2E_MODEL: ${E2E_MODEL:-}
+      E2E_MODEL_PROVIDER: ${E2E_MODEL_PROVIDER:-}
+      E2E_MODEL_BASE_URL: ${E2E_MODEL_BASE_URL:-}
+      E2E_MODEL_API_KEY: ${E2E_MODEL_API_KEY:-}
       AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-}
       CI: "1"
-    volumes:
-      - ./lib:/gem/lib
-      - ./bridge:/gem/bridge
-      - ./spec:/gem/spec
-      - ./example/spec:/gem/example/spec
-      - ./example/test:/gem/example/test
-      - ./example/app:/gem/example/app
-      - ./example/e2e.config.ts:/gem/example/e2e.config.ts
-    # Unit specs (no browser), then the browser examples in RSpec and Minitest.
-    command: >
-      sh -c "bundle exec rspec spec
-      && bundle exec rspec example/spec/greeting_spec.rb
-      && bundle exec ruby -Ilib example/test/greeting_test.rb"
+    command: bundle exec rspec example/spec/agentic_spec.rb

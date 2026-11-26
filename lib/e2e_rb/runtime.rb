@@ -1,47 +1,12 @@
 # frozen_string_literal: true
 
 module E2eRb
-  # Settings. Each one is read from its env var unless set in E2eRb.configure.
-  class Configuration
-    # Directory with package.json + node_modules/e2e + e2e.config.ts.
-    attr_accessor :project_dir
-    # e2e config file, relative to project_dir. nil: e2e's own discovery.
-    attr_accessor :config
-    # Target name; required by e2e when the config declares several.
-    attr_accessor :target
-    attr_accessor :headed
-    # Node executable.
-    attr_accessor :node
-    # Session deadline in ms. nil: the config's timeout.
-    attr_accessor :timeout
-    # Called with every e2e step progress event (Hash).
-    attr_accessor :on_step
-    # Called with host notices (target, message).
-    attr_accessor :on_notice
-
-    def initialize(env = ENV)
-      @project_dir = env.fetch("E2E_RB_PROJECT_DIR", Dir.pwd)
-      @config = env["E2E_RB_CONFIG"]
-      @target = env["E2E_RB_TARGET"]
-      @headed = env["E2E_RB_HEADED"] == "1"
-      @node = env.fetch("E2E_RB_NODE", "node")
-      @timeout = env["E2E_RB_TIMEOUT_MS"]&.then { |value| Integer(value) }
-      @on_step = env["E2E_RB_VERBOSE"] == "1" ? method(:print_step) : nil
-      @on_notice = ->(target, message) { warn "[e2e #{target}] #{message}" }
-    end
-
-    private
-
-    def print_step(step)
-      return unless step["phase"] == "end"
-
-      warn "[e2e] #{step["api"]} #{step["label"]}: #{step["status"]} (#{step["durationMs"]}ms, #{step["modelCalls"]} model calls)"
-    end
-  end
-
   # Per-process state: one bridge, one host, at most one open session.
-  # A forked worker (parallel_tests, Minitest fork) starts its own bridge.
+  # A forked worker starts its own bridge; a separately spawned worker process
+  # (one Ruby process per test file) has its own runtime anyway.
   class Runtime
+    ONE_SESSION = "e2e allows one per process (use process parallelism, not threads)"
+
     attr_reader :bridge
 
     def initialize(configuration)
@@ -50,55 +15,86 @@ module E2eRb
       @session = nil
     end
 
-    def open_session(name:, timeout: @configuration.timeout, agent: nil)
+    def open_session(name:, failure_class: TestFailure, timeout: @configuration.timeout, agent: nil)
       ensure_host
-      raise Error, "session #{@session.name.inspect} is still open; e2e allows one per process (use process parallelism, not threads)" if @session
+      raise Error, "session #{@session.name.inspect} is still open; #{ONE_SESSION}" if @session
 
       info = @bridge.request("session/open", "name" => name, "timeout" => timeout, "agent" => agent)
-      @session = Session.new(self, name: name, info: info)
+      @session = Session.new(self, name: name, info: info, failure_class: failure_class)
     end
 
     def close_session(session)
-      raise Error, "closing #{session.name.inspect}, but #{@session&.name.inspect} is open" unless @session.equal?(session)
+      return close_open_session if @session.equal?(session)
 
+      raise Error, "closing #{session.name.inspect}, but #{@session&.name.inspect} is open"
+    end
+
+    # Closes the host (stops the app, the engine) and the bridge. Called by the
+    # adapters at the end of the suite; raises InfrastructureError with the reason
+    # when e2e reports a close failure or the bridge died, so the run fails.
+    def close!
+      return unless @bridge && @pid == Process.pid
+
+      bridge = @bridge
+      host_open = @host_open
+      forget_bridge
+      failures = host_open ? close_host(bridge) : []
+      bridge.shutdown
+      return if failures.empty?
+
+      raise InfrastructureError, "e2e host close failed: #{failures.map { |f| f["message"] }.join("; ")}"
+    end
+
+    # Last resort at process exit: ends the bridge without raising (the bridge
+    # closes its host when its input ends). The adapters' close! reports failures.
+    def reap
+      return unless @bridge && @pid == Process.pid
+
+      @bridge.reap
+      forget_bridge
+    end
+
+    private
+
+    def close_open_session
       @session = nil
       @bridge.request("session/close")
     end
 
-    def shutdown
-      return unless @bridge && @pid == Process.pid
-
-      result = @bridge.request("host/close") if @host_open
-      @host_open = false
-      @bridge.shutdown
-      @bridge = nil
-      failures = result ? result.fetch("failures") : []
-      raise InfrastructureError, "e2e host close failed: #{failures.map { |f| f["message"] }.join("; ")}" unless failures.empty?
+    # e2e's close failures. A dead bridge, or an error e2e raises, is a failure too.
+    def close_host(bridge)
+      bridge.request("host/close").fetch("failures")
+    rescue BridgeError, IOError, SystemCallError => e
+      bridge.reap
+      raise InfrastructureError, "e2e host close failed: the bridge is gone (#{e.message})"
+    rescue Error => e
+      bridge.shutdown
+      raise InfrastructureError, "e2e host close failed: #{e.message}"
     end
 
-    private
+    def forget_bridge
+      @bridge = nil
+      @host_open = false
+    end
 
     def ensure_host
       reset_after_fork if @pid != Process.pid
       return if @host_open
 
-      @bridge ||= Bridge.new(
-        node: @configuration.node,
-        cwd: File.expand_path(@configuration.project_dir),
-        on_notification: method(:notification)
-      )
-      @bridge.request("host/open",
-                      "config" => @configuration.config,
-                      "target" => @configuration.target,
-                      "headed" => @configuration.headed)
+      @bridge ||= Bridge.new(node: @configuration.node, cwd: @configuration.project_root,
+                             on_notification: method(:notification))
+      @bridge.request("host/open", "config" => @configuration.config, "target" => @configuration.target,
+                                   "headed" => @configuration.headed)
       @host_open = true
     end
 
-    # The parent's bridge belongs to the parent; a forked child starts fresh.
+    # The parent's bridge belongs to the parent: the child drops its copies of the
+    # pipe ends (so the parent's bridge still sees end of input when the parent
+    # exits) and starts its own.
     def reset_after_fork
+      @bridge&.close_inherited
       @pid = Process.pid
-      @bridge = nil
-      @host_open = false
+      forget_bridge
       @session = nil
     end
 

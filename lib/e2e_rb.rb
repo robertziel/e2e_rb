@@ -4,6 +4,9 @@ require "json"
 require_relative "e2e_rb/version"
 require_relative "e2e_rb/errors"
 require_relative "e2e_rb/wire"
+require_relative "e2e_rb/configuration"
+require_relative "e2e_rb/matchers"
+require_relative "e2e_rb/js_regexp"
 require_relative "e2e_rb/codec"
 require_relative "e2e_rb/proxy"
 require_relative "e2e_rb/bridge"
@@ -22,10 +25,19 @@ module E2eRb
       yield configuration
     end
 
-    def runtime = @runtime ||= Runtime.new(configuration).tap { |runtime| at_exit { runtime.shutdown } }
+    # The process's runtime. At exit it only reaps the bridge; reporting a host-close
+    # failure is the adapters' job (E2eRb.close! at the end of the suite).
+    def runtime = @runtime ||= Runtime.new(configuration).tap { |runtime| at_exit { runtime.reap } }
 
     # Opens one test attempt. Call #close on it when the test ends.
-    def open_session(name:, **options) = runtime.open_session(name: name, **options)
+    # failure_class: the class a failed expectation raises (the adapters pass their framework's).
+    def open_session(name:, **) = runtime.open_session(name: name, **)
+
+    # Closes the host and the bridge; raises InfrastructureError if e2e reports a failure.
+    # A no-op when no session was ever opened in this process.
+    def close!
+      @runtime&.close!
+    end
 
     # A secret from e2e's config (E2E_SECRET_<NAME>); its value never enters Ruby.
     def secret(name) = SecretRef.new("$secret" => name.to_s)

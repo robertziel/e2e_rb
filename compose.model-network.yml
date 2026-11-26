@@ -1,0 +1,13 @@
+# Optional: the agentic service joins an EXISTING docker network on which the model server
+# is reachable by name (a server that listens only inside docker). Enable in .env:
+#   COMPOSE_FILE=compose.yml:compose.model-network.yml
+#   E2E_MODEL_NETWORK=<that network's name>
+# and E2E_MODEL_BASE_URL=http://<its container name>:<port>/v1.
+services:
+  agentic:
+    networks: [model]
+
+networks:
+  model:
+    external: true
+    name: ${E2E_MODEL_NETWORK:?set E2E_MODEL_NETWORK in .env (compose.model-network.yml)}
