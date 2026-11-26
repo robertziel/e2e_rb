@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: A bug in e2e itself
+    url: https://github.com/e2e-inc/e2e/issues
+    about: The npm package, its engines and agents
+  - name: Security vulnerability
+    url: https://github.com/robertziel/e2e_rb/security/advisories/new
+    about: Report privately, never as a public issue
