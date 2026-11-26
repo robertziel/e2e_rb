@@ -13,7 +13,7 @@ require_relative "e2e_rb/bridge"
 require_relative "e2e_rb/session"
 require_relative "e2e_rb/runtime"
 
-# Ruby tests on top of e2e (https://e2e.com): agentic steps plus locators and
+# Ruby tests on top of e2e (https://github.com/e2e-inc/e2e): agentic steps plus locators and
 # expect, driven through a Node bridge that hosts e2e sessions.
 module E2eRb
   class << self

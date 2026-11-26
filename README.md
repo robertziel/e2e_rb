@@ -1,7 +1,18 @@
 # e2e_rb
 
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Ruby >= 3.2](https://img.shields.io/badge/ruby-%3E%3D%203.2-red.svg)](e2e_rb.gemspec)
+[![e2e ~> 0.23.1](https://img.shields.io/badge/e2e-~%3E%200.23.1-black.svg)](https://github.com/e2e-inc/e2e)
+
 RSpec and Minitest tests on top of [e2e](https://github.com/e2e-inc/e2e), the agentic end-to-end
 testing framework: `agent.act` / `agent.assert` plus e2e's auto-waiting locators and `expect`, from Ruby.
+
+- **Ruby owns the test run**: RSpec / Minitest collection, hooks, filters and reporting; e2e owns the browser, the
+  model, secrets and traces.
+- **Agentic and deterministic steps in one test**: `agent.act("…")` next to `screen.get_by_role(…).click`.
+- **e2e's own matchers**, as RSpec matchers and Minitest assertions (16 each), auto-waiting.
+- **Any app** e2e can start, any [AI SDK](https://ai-sdk.dev) model, or none (deterministic steps need no model).
+- **Process parallelism**: one bridge and one app port per worker.
 
 ```ruby
 RSpec.describe "billing", type: :e2e do
@@ -197,4 +208,11 @@ docker compose run --rm agentic    # agent steps against a real model (E2E_MODEL
 scripts/ci/test.sh matrix          # what CI runs: Ruby 3.2 / 3.3 / 3.4 / 4.0, Minitest 6 and 5
 ```
 
-[CHANGELOG](CHANGELOG.md) · Apache-2.0 ([LICENSE](LICENSE))
+## Contributing
+
+Issues and pull requests are welcome: [CONTRIBUTING.md](CONTRIBUTING.md) (setup, tests, what a PR needs).
+Security issues: [SECURITY.md](SECURITY.md), never a public issue. Changes per release: [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+[Apache-2.0](LICENSE). e2e itself is a separate project ([e2e-inc/e2e](https://github.com/e2e-inc/e2e), Apache-2.0).
