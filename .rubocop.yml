@@ -1,0 +1,21 @@
+# RuboCop's defaults, every new cop enabled, default limits. A rule changes here, for the
+# whole repo and with its reason; never per file, never a todo list.
+AllCops:
+  TargetRubyVersion: 3.2
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - "example/node_modules/**/*" # npm packages, not this repo's code
+    - "vendor/**/*"               # installed gems, not this repo's code
+
+# Style, not a limit: the repo is double-quoted throughout.
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes
+
+# Protocol names others define: RuboCop's default (Ruby's is_a?) plus RSpec's matcher protocol.
+Naming/PredicatePrefix:
+  AllowedMethods:
+    - is_a?
+    - does_not_match?

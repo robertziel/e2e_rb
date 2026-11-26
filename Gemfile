@@ -4,5 +4,6 @@ source "https://rubygems.org"
 
 gemspec
 
-gem "minitest", "~> 5.25"
+gem "minitest", "~> 6.0"
 gem "rspec", "~> 3.13"
+gem "rubocop", "~> 1.81", require: false

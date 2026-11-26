@@ -28,14 +28,17 @@ module E2eRb
       case value
       when Hash then value.to_h { |key, inner| [key.to_s, encode(inner)] }
       when Array then value.map { |inner| encode(inner) }
-      when Regexp then { "$regex" => { "source" => value.source, "flags" => regexp_flags(value) } }
+      when Regexp then { "$regex" => JsRegexp.new(value).to_wire }
       when Symbol then value.to_s
-      when String, Integer, Float, true, false, nil then value
-      else
-        return value.__e2e_wire__ if value.respond_to?(:__e2e_wire__)
-
-        raise ArgumentError, "cannot send #{value.class} to e2e"
+      else encode_scalar(value)
       end
+    end
+
+    def encode_scalar(value)
+      return value if [String, Integer, Float, TrueClass, FalseClass, NilClass].any? { |type| value.is_a?(type) }
+      return value.__e2e_wire__ if value.respond_to?(:__e2e_wire__)
+
+      raise ArgumentError, "cannot send #{value.class} to e2e"
     end
 
     # Symbol keys of option hashes are Ruby-style (snake_case) and become camelCase.
@@ -43,18 +46,9 @@ module E2eRb
     def encode_options(options)
       options.to_h do |key, value|
         name = key.is_a?(Symbol) ? js_name(key) : key.to_s
-        encoded = key.to_s == "params" ? encode(value) : (value.is_a?(Hash) ? encode_options(value) : encode(value))
-        [name, encoded]
+        nested = value.is_a?(Hash) && key.to_s != "params"
+        [name, nested ? encode_options(value) : encode(value)]
       end
-    end
-
-    def regexp_flags(regexp)
-      flags = +""
-      flags << "i" if regexp.options & Regexp::IGNORECASE != 0
-      flags << "s" if regexp.options & Regexp::MULTILINE != 0
-      raise ArgumentError, "JavaScript regexps have no extended (x) mode: #{regexp.inspect}" if regexp.options & Regexp::EXTENDED != 0
-
-      flags
     end
   end
 

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-# Needs a model: E2E_MODEL and AI_GATEWAY_API_KEY (see .env.example).
+# Needs a model: E2E_MODEL + E2E_MODEL_PROVIDER and that provider's settings (.env.example).
+# Run with `docker compose run --rm agentic`.
 require "e2e_rb/rspec"
 
 RSpec.describe "greeting page, agent-driven", type: :e2e do

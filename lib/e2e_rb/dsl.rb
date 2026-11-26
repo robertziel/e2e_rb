@@ -21,8 +21,10 @@ module E2eRb
 
     private
 
-    def e2e_open(name)
-      @e2e_session = E2eRb.open_session(name: name)
+    def e2e_open(name, failure_class:)
+      @e2e_trace_path = nil
+      @e2e_session = E2eRb.open_session(name: name, failure_class: failure_class)
+      @e2e_trace_path = @e2e_session.trace_path
     end
 
     # Closes the attempt; returns the failure message e2e reported, or nil.
@@ -37,6 +39,18 @@ module E2eRb
       "e2e reported #{failures.size} failure(s) at close:\n" +
         failures.map { |f| "  - #{f["message"]}#{" [#{f["code"]}]" if f["code"]}" }.join("\n") +
         "\n  e2e trace: #{session.trace_path}"
+    end
+
+    # Adds the test's trace.md path to a failure that does not name it yet (a plain
+    # assert_equal, an exception from the test's own code), so every failed e2e test
+    # points at its trace.
+    def e2e_annotate(exception)
+      trace = @e2e_trace_path
+      return exception if trace.nil? || exception.message.include?(trace)
+
+      line = "\n  e2e trace: #{trace}"
+      exception.singleton_class.define_method(:message) { "#{super()}#{line}" }
+      exception
     end
   end
 end

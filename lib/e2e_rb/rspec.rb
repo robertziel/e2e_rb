@@ -7,25 +7,8 @@ require_relative "dsl"
 
 module E2eRb
   module RSpec
-    # Ruby matcher name -> e2e matcher.
-    MATCHERS = {
-      be_visible: "toBeVisible",
-      be_hidden: "toBeHidden",
-      be_attached: "toBeAttached",
-      be_enabled: "toBeEnabled",
-      be_disabled: "toBeDisabled",
-      be_checked: "toBeChecked",
-      be_selected: "toBeSelected",
-      be_expanded: "toBeExpanded",
-      be_focused: "toBeFocused",
-      have_text: "toHaveText",
-      contain_text: "toContainText",
-      have_value: "toHaveValue",
-      have_attribute: "toHaveAttribute",
-      have_count: "toHaveCount",
-      have_accessible_name: "toHaveAccessibleName",
-      have_screenshot: "toHaveScreenshot"
-    }.freeze
+    # Ruby matcher name -> e2e matcher (from E2eRb::MATCHERS).
+    MATCHERS = E2eRb::MATCHERS.to_h { |row| [row[:rspec], row[:e2e]] }.freeze
 
     # expect(locator).to have_text("x") runs e2e's own auto-waiting matcher in Node.
     class Matcher
@@ -57,7 +40,8 @@ module E2eRb
           raise ArgumentError, "#{@ruby_name} is e2e's matcher and takes a locator or screen, got #{actual.inspect}"
         end
 
-        actual.__e2e_session__.run_expectation(actual, @e2e_name, @positional, @options, negate: negate, soft: false)
+        args = E2eRb::Codec.args(@positional, @options)
+        actual.__e2e_session__.run_expectation(actual, @e2e_name, args, negate: negate, soft: false)
         true
       rescue E2eRb::Failure => e
         @failure_message = e.message
@@ -65,6 +49,7 @@ module E2eRb
       end
     end
 
+    # be_visible, have_text, ...: one RSpec matcher per row of E2eRb::MATCHERS.
     module Matchers
       MATCHERS.each do |ruby_name, e2e_name|
         define_method(ruby_name) { |*positional, **options| Matcher.new(ruby_name, e2e_name, positional, options) }
@@ -78,18 +63,21 @@ module E2eRb
   end
 end
 
-# e2e test failures are RSpec expectation failures, not errors.
-E2eRb.failure_class = RSpec::Expectations::ExpectationNotMetError
-
 RSpec.configure do |config|
   config.include E2eRb::RSpec::DSL, type: :e2e
 
   config.before(:each, type: :e2e) do |example|
-    e2e_open(example.metadata[:full_description])
+    # e2e test failures are RSpec expectation failures, not errors.
+    e2e_open(example.metadata[:full_description], failure_class: RSpec::Expectations::ExpectationNotMetError)
   end
 
-  config.after(:each, type: :e2e) do
+  config.after(:each, type: :e2e) do |example|
     message = e2e_close
-    raise E2eRb.failure(message) if message
+    raise E2eRb.failure(message, failure_class: RSpec::Expectations::ExpectationNotMetError) if message
+  ensure
+    e2e_annotate(example.exception) if example.exception
   end
+
+  # The host (app, engine) closes with the suite; a close failure fails the run.
+  config.after(:suite) { E2eRb.close! }
 end

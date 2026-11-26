@@ -3,3 +3,4 @@
 /.bundle/
 /vendor/
 .env
+.ci-model.env

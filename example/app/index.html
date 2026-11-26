@@ -6,12 +6,28 @@
       <h1>say hello</h1>
       <form id="form">
         <label for="name">name</label>
-        <input id="name" name="name" />
+        <input id="name" name="name" title="your name" />
         <button type="submit">greet</button>
       </form>
       <p id="out"></p>
+      <section aria-label="controls">
+        <label><input type="checkbox" id="news" /> newsletter</label>
+        <button type="button" disabled>archive</button>
+        <button type="button" id="more" aria-expanded="false" aria-controls="details">more</button>
+        <div id="details" hidden>details</div>
+        <div role="tablist"><button role="tab" aria-selected="true">one</button><button role="tab" aria-selected="false">two</button></div>
+        <ul><li>red</li><li>green</li><li>blue</li></ul>
+      </section>
+      <!-- Which port this app instance listens on: parallel workers each get their own. -->
+      <p data-testid="port"></p>
     </main>
     <script>
+      document.querySelector('[data-testid="port"]').textContent = location.port;
+      document.getElementById('more').addEventListener('click', (event) => {
+        const open = event.currentTarget.getAttribute('aria-expanded') === 'true';
+        event.currentTarget.setAttribute('aria-expanded', String(!open));
+        document.getElementById('details').hidden = open;
+      });
       document.getElementById('form').addEventListener('submit', (event) => {
         event.preventDefault();
         const name = document.getElementById('name').value.trim();

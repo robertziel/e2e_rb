@@ -14,6 +14,8 @@ import { createWriteStream } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { satisfies } from './node-range.mjs';
+import { plain } from './plain.mjs';
 
 const PROTOCOL_VERSION = 1;
 
@@ -47,6 +49,15 @@ const state = {
 function requireState(key, what) {
   if (state[key] === undefined) throw protocolError(`${what} is not open`);
   return state[key];
+}
+
+// A member the e2e object does not have: a NoMethodError in Ruby.
+function noMemberError(root, member) {
+  const error = new Error(`${root} has no member ${JSON.stringify(member)}`);
+  error.name = 'NoMember';
+  error.code = 'BRIDGE_NO_MEMBER';
+  error.member = member;
+  return error;
 }
 
 function protocolError(message) {
@@ -96,7 +107,7 @@ function encodeResult(value) {
     return { kind: 'locators', count: value.length };
   }
   if (value === undefined) return { kind: 'value', value: null };
-  return { kind: 'value', value: JSON.parse(JSON.stringify(value)) };
+  return { kind: 'value', value: plain(value, 'the result') };
 }
 
 // Re-applies a call chain to a session fixture. Locators are immutable
@@ -117,7 +128,7 @@ async function evaluate(root, chain) {
     if (typeof member === 'function') {
       target = await member.apply(target, args);
     } else if (member === undefined) {
-      throw protocolError(`${root} has no member ${JSON.stringify(step.m)}`);
+      throw noMemberError(root, step.m);
     } else if (args.length > 0) {
       throw protocolError(`${step.m} is a property, not a method; it takes no arguments`);
     } else {
@@ -135,11 +146,18 @@ function serializeError(error) {
     data: {
       name: error?.name ?? 'Error',
       e2e,
-      category: e2e ? error.category : error?.code === 'BRIDGE_PROTOCOL' ? 'bridge' : 'internal',
+      category: e2e ? error.category : bridgeCategory(error),
       e2eCode: typeof error?.code === 'string' ? error.code : undefined,
+      member: error?.code === 'BRIDGE_NO_MEMBER' ? error.member : undefined,
       retryable: e2e ? error.retryable : false,
     },
   };
+}
+
+function bridgeCategory(error) {
+  if (error?.code === 'BRIDGE_NO_MEMBER') return 'no_member';
+  if (error?.code === 'BRIDGE_PROTOCOL') return 'bridge';
+  return 'internal';
 }
 
 function serializeFailures(failures) {
@@ -168,11 +186,17 @@ const methods = {
     } catch {
       throw protocolError(`e2e is not installed in ${state.cwd}; run npm install e2e there`);
     }
+    // Read the e2e package that resolved, and refuse a Node it does not support before loading it.
+    const packageJsonPath = path.join(runnerPath.slice(0, runnerPath.lastIndexOf(`${path.sep}dist${path.sep}`)), 'package.json');
+    const e2ePackage = projectRequire(packageJsonPath);
+    const engines = e2ePackage.engines?.node;
+    if (engines === undefined) throw protocolError(`e2e ${e2ePackage.version} states no engines.node; cannot check Node ${process.version}`);
+    if (!satisfies(process.versions.node, engines)) {
+      throw protocolError(`Node ${process.version} cannot run e2e ${e2ePackage.version} (it needs node ${engines}); set E2E_RB_NODE to a supported node`);
+    }
+    state.e2eVersion = e2ePackage.version;
     state.runner = await import(pathToFileURL(runnerPath).href);
     state.sdk = await import(pathToFileURL(projectRequire.resolve('e2e')).href);
-    // Read the version from the e2e package that resolved.
-    const packageJsonPath = path.join(runnerPath.slice(0, runnerPath.lastIndexOf(`${path.sep}dist${path.sep}`)), 'package.json');
-    state.e2eVersion = projectRequire(packageJsonPath).version;
     return { protocolVersion: PROTOCOL_VERSION, e2eVersion: state.e2eVersion, nodeVersion: process.version };
   },
 

@@ -28,9 +28,9 @@ RSpec.describe "failure reporting", type: :e2e do
   before { app.open("/") }
 
   it "turns a failed e2e expectation into an RSpec failure with the trace path" do
-    expect {
+    expect do
       expect(screen.get_by_role("heading")).to have_text("wrong heading", timeout: 500)
-    }.to raise_error(RSpec::Expectations::ExpectationNotMetError, /e2e trace: .*trace\.md/)
+    end.to raise_error(RSpec::Expectations::ExpectationNotMetError, /e2e trace: .*trace\.md/)
   end
 
   it "raises a configuration error for an unknown fixture" do

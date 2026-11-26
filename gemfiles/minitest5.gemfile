@@ -1,0 +1,11 @@
+# frozen_string_literal: true
+
+# The same development dependencies as ../Gemfile, on Minitest 5 (CI runs the Minitest
+# examples on both majors).
+source "https://rubygems.org"
+
+gemspec path: ".."
+
+gem "minitest", "~> 5.25"
+gem "rspec", "~> 3.13"
+gem "rubocop", "~> 1.81", require: false
