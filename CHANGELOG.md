@@ -17,3 +17,5 @@ First release. Works with e2e `~> 0.23.1` (npm), Ruby >= 3.2, RSpec 3.13, Minite
 - Ruby regexps are translated to JavaScript (`\A`, `\z`, `\Z`, `\h`, line anchors); syntax JavaScript
   lacks raises `ArgumentError`.
 - The bridge refuses a Node outside e2e's `engines.node` and results that have no JSON form.
+- The gem passes RubyGems' strict validation (`gem build --strict`: no warnings); `rake` runs the unit
+  specs and RuboCop, `rake build` packages the gem (strict); there is no `rake release`.

@@ -10,11 +10,8 @@ step "bridge: syntax + node unit tests"
 for f in bridge/*.mjs bridge/test/*.mjs; do node --check "$f"; done
 node --test bridge/test/*.test.mjs
 
-step "rubocop"
-bundle exec rubocop
-
-step "unit specs"
-bundle exec rspec spec
+step "rake: unit specs + rubocop (the default task)"
+bundle exec rake
 
 step "RSpec examples (browser, no model)"
 bundle exec rspec example/spec/greeting_spec.rb example/spec/no_model_spec.rb \
@@ -29,8 +26,10 @@ step "parallel worker processes"
 bundle exec ruby scripts/parallel_workers.rb 4
 
 step "the built gem, installed, outside the checkout"
-gem build e2e_rb.gemspec --output /tmp/e2e_rb.gem
-GEM_HOME=/tmp/e2e_rb-gems gem install --local --no-document /tmp/e2e_rb.gem
+# Through the Rakefile's build task (gem build --strict: any RubyGems warning fails) → pkg/.
+bundle exec rake build
+package=pkg/e2e_rb-$(ruby -Ilib -re2e_rb/version -e 'print E2eRb::VERSION').gem
+GEM_HOME=/tmp/e2e_rb-gems gem install --local --no-document "$package"
 # Not bundler, not -Ilib: the installed gem plus the image's gems (every dir of its gem path).
 image_gems=$(gem env gempath)
 (cd /tmp && GEM_HOME=/tmp/e2e_rb-gems GEM_PATH="/tmp/e2e_rb-gems:$image_gems" ruby -e '
