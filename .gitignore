@@ -4,3 +4,4 @@
 /vendor/
 .env
 .ci-model.env
+/pkg/

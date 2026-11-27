@@ -206,6 +206,7 @@ docker compose run --rm test       # scripts/ci/suite.sh: bridge tests, unit spe
                                    # examples, parallel workers, the built gem installed — no network
 docker compose run --rm agentic    # agent steps against a real model (E2E_MODEL_*, .env.example)
 scripts/ci/test.sh matrix          # what CI runs: Ruby 3.2 / 3.3 / 3.4 / 4.0, Minitest 6 and 5
+docker compose run --rm test bundle exec rake   # only the unit specs + RuboCop (Rakefile)
 ```
 
 ## Contributing
